@@ -26,26 +26,26 @@ type Filter interface {
 }
 
 var (
-	_ Filter = (*MaxBackupsFilter)(nil)
-	_ Filter = (*MaxAgeFilter)(nil)
+	_ Filter = (*maxBackupsFilter)(nil)
+	_ Filter = (*maxAgeFilter)(nil)
 )
 
 // MaxSizeFilter filter files by size
-type MaxBackupsFilter struct {
+type maxBackupsFilter struct {
 	maxBackups int
 }
 
-func NewMaxBackupsFilter(maxBackups int) *MaxBackupsFilter {
-	return &MaxBackupsFilter{
+func MaxBackupsFilter(maxBackups int) *maxBackupsFilter {
+	return &maxBackupsFilter{
 		maxBackups: maxBackups,
 	}
 }
 
-func (f *MaxBackupsFilter) Name() string {
+func (f *maxBackupsFilter) Name() string {
 	return "MaxBackupsFilter"
 }
 
-func (f *MaxBackupsFilter) Filter(files []os.DirEntry) ([]os.DirEntry, []os.DirEntry, error) {
+func (f *maxBackupsFilter) Filter(files []os.DirEntry) ([]os.DirEntry, []os.DirEntry, error) {
 	var removes []os.DirEntry
 	if f.maxBackups >= 0 && len(files) > f.maxBackups {
 		removes = files[f.maxBackups:]
@@ -53,22 +53,22 @@ func (f *MaxBackupsFilter) Filter(files []os.DirEntry) ([]os.DirEntry, []os.DirE
 	return files[:min(len(files), f.maxBackups)], removes, nil
 }
 
-// MaxAgeFilter filter files by age
-type MaxAgeFilter struct {
+// maxAgeFilter filter files by age
+type maxAgeFilter struct {
 	maxAge time.Duration
 }
 
-func NewMaxAgeFilter(maxAge time.Duration) (obj *MaxAgeFilter) {
-	return &MaxAgeFilter{
+func MaxAgeFilter(maxAge time.Duration) (obj *maxAgeFilter) {
+	return &maxAgeFilter{
 		maxAge: maxAge,
 	}
 }
 
-func (f *MaxAgeFilter) Name() string {
+func (f *maxAgeFilter) Name() string {
 	return "MaxAgeFilter"
 }
 
-func (f *MaxAgeFilter) Filter(files []os.DirEntry) ([]os.DirEntry, []os.DirEntry, error) {
+func (f *maxAgeFilter) Filter(files []os.DirEntry) ([]os.DirEntry, []os.DirEntry, error) {
 	// todo binary search improve
 	if f.maxAge <= 0 {
 		return nil, nil, nil

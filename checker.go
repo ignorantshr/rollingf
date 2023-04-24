@@ -27,28 +27,28 @@ type Checker interface {
 }
 
 var (
-	_ Checker = (*IntervalChecker)(nil)
-	_ Checker = (*MaxSizeChecker)(nil)
+	_ Checker = (*intervalChecker)(nil)
+	_ Checker = (*maxSizeChecker)(nil)
 )
 
-// IntervalChecker checks whether a file should be rolled at regular intervals
+// intervalChecker checks whether a file should be rolled at regular intervals
 //
 // If interval <= 0, it will never roll.
-type IntervalChecker struct {
+type intervalChecker struct {
 	interval time.Duration
 }
 
-func NewIntervalChecker(interval time.Duration) *IntervalChecker {
-	return &IntervalChecker{
+func IntervalChecker(interval time.Duration) *intervalChecker {
+	return &intervalChecker{
 		interval: interval,
 	}
 }
 
-func (c *IntervalChecker) Name() string {
+func (c *intervalChecker) Name() string {
 	return "IntervalChecker"
 }
 
-func (c *IntervalChecker) Check(_ string, stat fs.FileInfo) (bool, error) {
+func (c *intervalChecker) Check(_ string, stat fs.FileInfo) (bool, error) {
 	if c.interval <= 0 {
 		return false, nil
 	}
@@ -57,22 +57,22 @@ func (c *IntervalChecker) Check(_ string, stat fs.FileInfo) (bool, error) {
 	return time.Now().After(time.Unix(st.Birthtimespec.Unix()).Add(c.interval)), nil
 }
 
-// MaxSizeChecker checks whether a file should be rolled when its size exceeds maxSize
-type MaxSizeChecker struct {
+// maxSizeChecker checks whether a file should be rolled when its size exceeds maxSize
+type maxSizeChecker struct {
 	maxSize int64
 }
 
-func NewMaxSizeChecker(maxSize int64) *MaxSizeChecker {
-	return &MaxSizeChecker{
+func MaxSizeChecker(maxSize int64) *maxSizeChecker {
+	return &maxSizeChecker{
 		maxSize: maxSize,
 	}
 }
 
-func (c *MaxSizeChecker) Name() string {
+func (c *maxSizeChecker) Name() string {
 	return "MaxSizeChecker"
 }
 
-func (c *MaxSizeChecker) Check(_ string, stat fs.FileInfo) (bool, error) {
+func (c *maxSizeChecker) Check(_ string, stat fs.FileInfo) (bool, error) {
 	if c.maxSize <= 0 {
 		return false, nil
 	}

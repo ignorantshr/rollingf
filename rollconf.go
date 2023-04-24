@@ -54,16 +54,16 @@ func NewRollConf(filePath string, interval time.Duration, maxSize int64, maxAge 
 	}
 }
 
-func NewDefaultChecker(c RollCheckerConf) []Checker {
+func DefaultChecker(c RollCheckerConf) []Checker {
 	return []Checker{
-		NewIntervalChecker(c.Interval),
-		NewMaxSizeChecker(c.MaxSize),
+		IntervalChecker(c.Interval),
+		MaxSizeChecker(c.MaxSize),
 	}
 }
 
-func NewDefaultFilter(c RollFilterConf) []Filter {
+func DefaultFilter(c RollFilterConf) []Filter {
 	return []Filter{
-		NewMaxBackupsFilter(c.MaxBackups),
-		NewMaxAgeFilter(c.MaxAge),
+		MaxBackupsFilter(c.MaxBackups),
+		MaxAgeFilter(c.MaxAge),
 	}
 }

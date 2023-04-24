@@ -73,12 +73,12 @@ func New(c RollConf) *Roll {
 }
 
 func (r *Roll) WithDefaultChecker(c RollCheckerConf) *Roll {
-	r.WithChecker(NewDefaultChecker(c)...)
+	r.WithChecker(DefaultChecker(c)...)
 	return r
 }
 
 func (r *Roll) WithDefaultFilter(c RollFilterConf) *Roll {
-	r.WithFilter(NewDefaultFilter(c)...)
+	r.WithFilter(DefaultFilter(c)...)
 	return r
 }
 

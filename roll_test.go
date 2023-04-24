@@ -58,9 +58,10 @@ func TestNewRoll(t *testing.T) {
 
 func BenchmarkNewRoll(b *testing.B) {
 	r := NewRoll("/tmp/any_app/app.log").
-		WithChecker(NewMaxSizeChecker(1024 * 1024)).
-		WithFilter(NewMaxBackupsFilter(1)).
-		WithFilter(NewMaxAgeFilter(28 * 24 * time.Hour)).
+		WithChecker(IntervalChecker(1 * time.Minute)).
+		WithChecker(MaxSizeChecker(1024 * 1024)).
+		WithFilter(MaxBackupsFilter(1)).
+		WithFilter(MaxAgeFilter(28 * 24 * time.Hour)).
 		WithProcessor(NewDefaultProcessor())
 
 	defer func() {
