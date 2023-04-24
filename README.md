@@ -70,7 +70,7 @@ All the components has the default implementions.
 ### Customized usage with default implements
 
 ```go
-    rf := rollingf.NewRoll("/tmp/any_app/any_app.log")
+    rf := rollingf.NewC("/tmp/any_app/any_app.log")
     if rf == nil {
       return
     }
