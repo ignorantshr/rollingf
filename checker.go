@@ -27,14 +27,14 @@ type Checker interface {
 
 // IntervalChecker checks whether a file should be rolled at regular intervals
 //
-// If internal <= 0, it will never roll.
+// If interval <= 0, it will never roll.
 type IntervalChecker struct {
-	internal time.Duration
+	interval time.Duration
 }
 
-func NewIntervalChecker(internal time.Duration) *IntervalChecker {
+func NewIntervalChecker(interval time.Duration) *IntervalChecker {
 	return &IntervalChecker{
-		internal: internal,
+		interval: interval,
 	}
 }
 
@@ -43,7 +43,7 @@ func (c *IntervalChecker) Name() string {
 }
 
 func (c *IntervalChecker) Check(filePath string) (bool, error) {
-	if c.internal <= 0 {
+	if c.interval <= 0 {
 		return false, nil
 	}
 
@@ -51,7 +51,7 @@ func (c *IntervalChecker) Check(filePath string) (bool, error) {
 	if err := syscall.Stat(filePath, &st); err != nil {
 		return false, err
 	}
-	if time.Now().Before(time.Unix(st.Birthtimespec.Unix()).Add(c.internal)) {
+	if time.Now().Before(time.Unix(st.Birthtimespec.Unix()).Add(c.interval)) {
 		return false, nil
 	}
 
