@@ -15,6 +15,7 @@
 package rollinguf
 
 import (
+	"errors"
 	"io"
 	"io/fs"
 	"os"
@@ -32,9 +33,10 @@ type Roll struct {
 	filters   []Filter
 	processor Processor
 
-	f    *os.File
-	st   *Rstat
-	lock *sync.Mutex
+	f       *os.File
+	st      *Rstat
+	lock    *sync.Mutex
+	running bool
 }
 
 // NewRoll creates a customizable Roll
@@ -47,6 +49,7 @@ func NewRoll(filePath string) *Roll {
 	r := &Roll{
 		filePath: filePath,
 		lock:     &sync.Mutex{},
+		running:  true,
 	}
 
 	if err := r.Open(); err != nil {
@@ -59,13 +62,8 @@ func NewRoll(filePath string) *Roll {
 
 // New roll creates a Roll with default components
 func New(c RollConf) *Roll {
-	r := &Roll{
-		filePath: c.FilePath,
-		lock:     &sync.Mutex{},
-	}
-
-	if err := r.Open(); err != nil {
-		debug("[NewRoll] %v", err)
+	r := NewRoll(c.FilePath)
+	if r == nil {
 		return nil
 	}
 
@@ -117,6 +115,10 @@ func (r *Roll) Write(p []byte) (n int, err error) {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
+	if !r.Running() {
+		return 0, nil
+	}
+
 	// check
 	rolling, err := r.checkChain()
 	if err != nil {
@@ -140,6 +142,10 @@ func (r *Roll) Write(p []byte) (n int, err error) {
 
 func (r *Roll) Open() error {
 	debug("[Open]")
+	if !r.Running() {
+		return errors.New("rollinguf is not running")
+	}
+
 	var err error
 	r.f, err = os.OpenFile(r.filePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
@@ -158,6 +164,15 @@ func (r *Roll) Open() error {
 
 func (r *Roll) Close() error {
 	debug("[Close]")
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
+	r.running = false
+	return r.closeFile()
+}
+
+func (r *Roll) closeFile() error {
+	debug("[CloseFile]")
 	return r.f.Close()
 }
 
@@ -198,7 +213,11 @@ func (r *Roll) roll() error {
 		return remains[idx].Name()
 	}, "[remain]")
 
-	if err := r.Close(); err != nil {
+	if !r.Running() {
+		return nil
+	}
+
+	if err := r.closeFile(); err != nil {
 		return err
 	}
 
@@ -250,4 +269,8 @@ func (r *Roll) filterChain(files []os.DirEntry) ([]os.DirEntry, []os.DirEntry, e
 	}
 
 	return remains, removed, nil
+}
+
+func (r *Roll) Running() bool {
+	return r.running
 }
