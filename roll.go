@@ -19,16 +19,18 @@ import (
 	"os"
 	"path"
 	"sort"
+	"sync"
 )
 
 type Roll struct {
 	filePath string
 
-	f *os.File
-
 	checkers  []Checker
 	filters   []Filter
 	processor Processor
+
+	f    *os.File
+	lock *sync.Mutex
 }
 
 // NewRoll creates a customizable Roll
@@ -40,6 +42,7 @@ type Roll struct {
 func NewRoll(filePath string) *Roll {
 	r := &Roll{
 		filePath: filePath,
+		lock:     &sync.Mutex{},
 	}
 
 	if err := r.Open(); err != nil {
@@ -54,6 +57,7 @@ func NewRoll(filePath string) *Roll {
 func New(c RollConf) *Roll {
 	r := &Roll{
 		filePath: c.FilePath,
+		lock:     &sync.Mutex{},
 	}
 
 	if err := r.Open(); err != nil {
@@ -106,6 +110,8 @@ func (r *Roll) WithProcessor(m Processor) *Roll {
 //  4. Finally the remains will be rolled.
 func (r *Roll) Write(p []byte) (n int, err error) {
 	debug("[Write]")
+	r.lock.Lock()
+	defer r.lock.Unlock()
 
 	// check
 	rolling, err := r.checkChain()
