@@ -49,7 +49,7 @@ func TestNewRoll(t *testing.T) {
 	}).WithDefaultFilter(RollFilterConf{
 		MaxBackups: 2,
 		MaxAge:     2 * time.Minute,
-	}).WithDefaultProcessor()
+	}).WithDefaultMatcher().WithDefaultProcessor()
 
 	r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
 	r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
@@ -62,7 +62,8 @@ func BenchmarkNewRollStd(b *testing.B) {
 		WithChecker(MaxSizeChecker(1024 * 1024)).
 		WithFilter(MaxBackupsFilter(1)).
 		WithFilter(MaxAgeFilter(28 * 24 * time.Hour)).
-		WithProcessor(NewDefaultProcessor())
+		WithDefaultMatcher().
+		WithDefaultProcessor()
 
 	log.SetOutput(r)
 	for i := 0; i < b.N; i++ {
@@ -78,7 +79,8 @@ func BenchmarkNewRoll(b *testing.B) {
 		WithChecker(MaxSizeChecker(1024 * 1024)).
 		WithFilter(MaxBackupsFilter(1)).
 		WithFilter(MaxAgeFilter(28 * 24 * time.Hour)).
-		WithProcessor(NewDefaultProcessor())
+		WithDefaultMatcher().
+		WithDefaultProcessor()
 	if r == nil {
 		b.Fatal("nil roll")
 	}

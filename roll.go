@@ -31,6 +31,7 @@ type Roll struct {
 
 	checkers  []Checker
 	filters   []Filter
+	matcher   Matcher
 	processor Processor
 
 	f       *os.File
@@ -43,6 +44,7 @@ type Roll struct {
 //
 // The following components need to be populated:
 //   - Checker
+//   - Mather
 //   - Filter
 //   - Processor
 func NewRoll(filePath string) *Roll {
@@ -69,8 +71,8 @@ func New(c RollConf) *Roll {
 
 	r = r.WithDefaultChecker(c.RollCheckerConf)
 	r = r.WithDefaultFilter(c.RollFilterConf)
-
-	r.processor = NewDefaultProcessor()
+	r = r.WithDefaultMatcher()
+	r = r.WithDefaultProcessor()
 	return r
 }
 
@@ -84,8 +86,13 @@ func (r *Roll) WithDefaultFilter(c RollFilterConf) *Roll {
 	return r
 }
 
+func (r *Roll) WithDefaultMatcher() *Roll {
+	r.WithMatcher(DefaultMatcher())
+	return r
+}
+
 func (r *Roll) WithDefaultProcessor() *Roll {
-	r.WithProcessor(NewDefaultProcessor())
+	r.WithProcessor(DefaultProcessor())
 	return r
 }
 
@@ -99,8 +106,13 @@ func (r *Roll) WithFilter(f ...Filter) *Roll {
 	return r
 }
 
-func (r *Roll) WithProcessor(m Processor) *Roll {
-	r.processor = m
+func (r *Roll) WithMatcher(m Matcher) *Roll {
+	r.matcher = m
+	return r
+}
+
+func (r *Roll) WithProcessor(p Processor) *Roll {
+	r.processor = p
 	return r
 }
 
@@ -186,7 +198,7 @@ func (r *Roll) roll() error {
 	// match
 	var files []fs.DirEntry
 	for _, e := range entries {
-		if e.Type().IsRegular() && r.processor.Match(e.Name()) {
+		if e.Type().IsRegular() && r.matcher.Match(e.Name()) {
 			files = append(files, e)
 		}
 	}
@@ -196,17 +208,9 @@ func (r *Roll) roll() error {
 	})
 
 	// filter
-	remains, removes, err := r.filterChain(files)
+	remains, err := r.filterChain(files)
 	if err != nil {
 		return err
-	}
-
-	// remove
-	for _, f := range removes {
-		debug("[remove] %v", f.Name())
-		if err := os.Remove(path.Join(dir, f.Name())); err != nil {
-			return err
-		}
 	}
 
 	debugArray(remains, func(idx int) string {
@@ -251,24 +255,23 @@ func (r *Roll) checkChain() (bool, error) {
 	return false, nil
 }
 
-func (r *Roll) filterChain(files []os.DirEntry) ([]os.DirEntry, []os.DirEntry, error) {
+func (r *Roll) filterChain(files []os.DirEntry) ([]os.DirEntry, error) {
 	var remains = files
-	var removed []os.DirEntry
 	for _, f := range r.filters {
 		items, tmp, err := f.Filter(remains)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if len(tmp) > 0 {
 			debugArray(tmp, func(idx int) string {
 				return tmp[idx].Name()
 			}, "[%s]", f.Name())
-			removed = append(removed, tmp...)
+			f.DealFiltered(path.Dir(r.filePath), tmp)
 		}
 		remains = items
 	}
 
-	return remains, removed, nil
+	return remains, nil
 }
 
 func (r *Roll) Running() bool {

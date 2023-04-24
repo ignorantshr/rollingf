@@ -16,13 +16,15 @@ package rollinguf
 
 import (
 	"os"
+	"path"
 	"time"
 )
 
-// Filter filters out the files that need to be deleted sorted by file name
+// Filter filters out the sorted-by-filename files that need to be processed
 type Filter interface {
 	Name() string
-	Filter(input []os.DirEntry) (remains []os.DirEntry, removed []os.DirEntry, err error)
+	Filter(input []os.DirEntry) (remains []os.DirEntry, filtered []os.DirEntry, err error)
+	DealFiltered(dir string, filtered []os.DirEntry) error
 }
 
 var (
@@ -51,6 +53,16 @@ func (f *maxBackupsFilter) Filter(files []os.DirEntry) ([]os.DirEntry, []os.DirE
 		removes = files[f.maxBackups:]
 	}
 	return files[:min(len(files), f.maxBackups)], removes, nil
+}
+
+func (f *maxBackupsFilter) DealFiltered(dir string, filtered []os.DirEntry) error {
+	for _, file := range filtered {
+		debug("[remove] %v", file.Name())
+		if err := os.Remove(path.Join(dir, file.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // maxAgeFilter filter files by age
@@ -85,4 +97,14 @@ func (f *maxAgeFilter) Filter(files []os.DirEntry) ([]os.DirEntry, []os.DirEntry
 		}
 	}
 	return files[:idx], files[idx:], nil
+}
+
+func (f *maxAgeFilter) DealFiltered(dir string, filtered []os.DirEntry) error {
+	for _, file := range filtered {
+		debug("[remove] %v", file.Name())
+		if err := os.Remove(path.Join(dir, file.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
 }

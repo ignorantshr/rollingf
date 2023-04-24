@@ -17,43 +17,26 @@ package rollinguf
 import (
 	"os"
 	"path"
-	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 )
 
-// Processor mathes the files and processes them
+// Processor processes the remaining files after filtering
 type Processor interface {
-
-	// Match return true if the file name matches the base
-	Match(base string) bool
-
-	// Process process the filtered files.
+	// Process process the remaining files after filtering
 	Process(dir string, remains []os.DirEntry) error
 }
 
-type DefaultProcessor struct {
-	reg  *regexp.Regexp
-	once sync.Once
+var _ Processor = (*defaultProcessor)(nil)
+
+type defaultProcessor struct {
 }
 
-func NewDefaultProcessor() *DefaultProcessor {
-	return &DefaultProcessor{}
+func DefaultProcessor() *defaultProcessor {
+	return &defaultProcessor{}
 }
 
-func (p *DefaultProcessor) Match(base string) bool {
-	return len(p.regexp(base).Find([]byte(path.Base(base)))) == len(base)
-}
-
-func (m *DefaultProcessor) regexp(file string) *regexp.Regexp {
-	m.once.Do(func() {
-		m.reg = regexp.MustCompile(strings.ReplaceAll(path.Base(file), ".", `\.`) + `\.?\d*`)
-	})
-	return m.reg
-}
-
-func (m *DefaultProcessor) Process(dir string, remains []os.DirEntry) error {
+func (m *defaultProcessor) Process(dir string, remains []os.DirEntry) error {
 	if len(remains) > 0 {
 		for i := len(remains) - 1; i >= 0; i-- {
 			if err := m.each(dir, remains[i].Name()); err != nil {
@@ -65,7 +48,7 @@ func (m *DefaultProcessor) Process(dir string, remains []os.DirEntry) error {
 	return nil
 }
 
-func (m *DefaultProcessor) each(dir, base string) error {
+func (m *defaultProcessor) each(dir, base string) error {
 	newName := m.incrTailNumber(base)
 
 	debug("[Rename] %v --> %v", base, newName)
@@ -81,7 +64,7 @@ func (m *DefaultProcessor) each(dir, base string) error {
 //
 //	base: "abc.log",
 //	return: "abc.log.1"
-func (m *DefaultProcessor) incrTailNumber(base string) string {
+func (m *defaultProcessor) incrTailNumber(base string) string {
 	if len(base) == 0 {
 		return base
 	}
