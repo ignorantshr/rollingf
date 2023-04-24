@@ -15,6 +15,7 @@
 package rollinguf
 
 import (
+	"io/fs"
 	"syscall"
 	"time"
 )
@@ -22,8 +23,13 @@ import (
 // Checker is a file checker, it checks if a file is shall be rolled.
 type Checker interface {
 	Name() string
-	Check(filePath string) (bool, error)
+	Check(filePath string, stat fs.FileInfo) (bool, error)
 }
+
+var (
+	_ Checker = (*IntervalChecker)(nil)
+	_ Checker = (*MaxSizeChecker)(nil)
+)
 
 // IntervalChecker checks whether a file should be rolled at regular intervals
 //
@@ -42,20 +48,13 @@ func (c *IntervalChecker) Name() string {
 	return "IntervalChecker"
 }
 
-func (c *IntervalChecker) Check(filePath string) (bool, error) {
+func (c *IntervalChecker) Check(_ string, stat fs.FileInfo) (bool, error) {
 	if c.interval <= 0 {
 		return false, nil
 	}
 
-	var st syscall.Stat_t
-	if err := syscall.Stat(filePath, &st); err != nil {
-		return false, err
-	}
-	if time.Now().Before(time.Unix(st.Birthtimespec.Unix()).Add(c.interval)) {
-		return false, nil
-	}
-
-	return true, nil
+	st := stat.Sys().(*syscall.Stat_t)
+	return time.Now().After(time.Unix(st.Birthtimespec.Unix()).Add(c.interval)), nil
 }
 
 // MaxSizeChecker checks whether a file should be rolled when its size exceeds maxSize
@@ -73,19 +72,11 @@ func (c *MaxSizeChecker) Name() string {
 	return "MaxSizeChecker"
 }
 
-func (c *MaxSizeChecker) Check(file string) (bool, error) {
+func (c *MaxSizeChecker) Check(_ string, stat fs.FileInfo) (bool, error) {
 	if c.maxSize <= 0 {
 		return false, nil
 	}
 
-	var st syscall.Stat_t
-	if err := syscall.Stat(file, &st); err != nil {
-		return false, err
-	}
-
-	if st.Size < c.maxSize {
-		return false, nil
-	}
-
-	return true, nil
+	st := stat.Sys().(*syscall.Stat_t)
+	return st.Size >= c.maxSize, nil
 }

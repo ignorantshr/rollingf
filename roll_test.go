@@ -69,9 +69,9 @@ func BenchmarkNewRoll(b *testing.B) {
 
 	log.SetOutput(r)
 	for i := 0; i < b.N; i++ {
-		log.Println([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-		log.Println([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-		log.Println([]byte("ccccccccccccccccccc\n"))
+		log.Println("aaaaaaaaaaaaaaaaaaa")
+		log.Println("bbbbbbbbbbbbbbbbbbb")
+		log.Println("ccccccccccccccccccc")
 	}
 }
 
@@ -85,8 +85,8 @@ func BenchmarkLumberjack(b *testing.B) {
 	})
 
 	for i := 0; i < b.N; i++ {
-		log.Println([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-		log.Println([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-		log.Println([]byte("ccccccccccccccccccc\n"))
+		log.Println("aaaaaaaaaaaaaaaaaaa")
+		log.Println("bbbbbbbbbbbbbbbbbbb")
+		log.Println("ccccccccccccccccccc")
 	}
 }

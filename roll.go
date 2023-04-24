@@ -195,9 +195,14 @@ func (r *Roll) roll() error {
 }
 
 func (r *Roll) checkChain() (bool, error) {
+	stat, err := os.Stat(r.filePath)
+	if err != nil {
+		return false, err
+	}
+
 	for _, checker := range r.checkers {
 		debug("[%s]", checker.Name())
-		rolling, err := checker.Check(r.filePath)
+		rolling, err := checker.Check(r.filePath, stat)
 		if err != nil {
 			return false, err
 		}

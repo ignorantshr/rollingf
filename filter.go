@@ -25,6 +25,11 @@ type Filter interface {
 	Filter(input []os.DirEntry) (remains []os.DirEntry, removed []os.DirEntry, err error)
 }
 
+var (
+	_ Filter = (*MaxBackupsFilter)(nil)
+	_ Filter = (*MaxAgeFilter)(nil)
+)
+
 // MaxSizeFilter filter files by size
 type MaxBackupsFilter struct {
 	maxBackups int
