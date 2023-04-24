@@ -1,4 +1,4 @@
-package rollinguf
+package rollingf
 
 import (
 	"fmt"
@@ -29,7 +29,7 @@ func debug(format string, args ...any) {
 		return
 	}
 	_, f, l, _ := runtime.Caller(1)
-	log.Printf(fmt.Sprintf("%s:%d [rollwf] ", f, l)+format+"\n", args...)
+	log.Printf(fmt.Sprintf("%s:%d [rollingf] ", f, l)+format+"\n", args...)
 }
 
 func debugArray(arr any, formator func(idx int) string, format string, args ...any) {
@@ -38,6 +38,6 @@ func debugArray(arr any, formator func(idx int) string, format string, args ...a
 	}
 	_, f, l, _ := runtime.Caller(1)
 	for i := range arr.([]os.DirEntry) {
-		log.Printf(fmt.Sprintf("%s:%d [rollwf] ", f, l) + fmt.Sprintf(format, args...) + fmt.Sprintf(" %s\n", formator(i)))
+		log.Printf(fmt.Sprintf("%s:%d [rollingf] ", f, l) + fmt.Sprintf(format, args...) + fmt.Sprintf(" %s\n", formator(i)))
 	}
 }

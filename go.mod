@@ -1,3 +1,3 @@
-module github.com/ignorantshr/rollinguf
+module github.com/ignorantshr/rollingf
 
 go 1.20

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package rollinguf
+package rollingf
 
 import (
 	"errors"
@@ -155,7 +155,7 @@ func (r *Roll) Write(p []byte) (n int, err error) {
 func (r *Roll) Open() error {
 	debug("[Open]")
 	if !r.Running() {
-		return errors.New("rollinguf is not running")
+		return errors.New("rollingf is not running")
 	}
 
 	var err error

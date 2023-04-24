@@ -1,4 +1,4 @@
-package rollinguf
+package rollingf
 
 import (
 	"bufio"
