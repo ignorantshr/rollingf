@@ -40,14 +40,14 @@ type Roll struct {
 	running bool
 }
 
-// NewRoll creates a customizable Roll
+// NewC creates a customizable Roll
 //
 // The following components need to be populated:
 //   - Checker
 //   - Mather
 //   - Filter
 //   - Processor
-func NewRoll(filePath string) *Roll {
+func NewC(filePath string) *Roll {
 	r := &Roll{
 		filePath: filePath,
 		lock:     &sync.Mutex{},
@@ -64,7 +64,7 @@ func NewRoll(filePath string) *Roll {
 
 // New roll creates a Roll with default components
 func New(c RollConf) *Roll {
-	r := NewRoll(c.FilePath)
+	r := NewC(c.FilePath)
 	if r == nil {
 		return nil
 	}
@@ -196,6 +196,9 @@ func (r *Roll) roll() error {
 	}
 
 	// match
+	if r.matcher == nil {
+		return nil
+	}
 	var files []fs.DirEntry
 	for _, e := range entries {
 		if e.Type().IsRegular() && r.matcher.Match(e.Name()) {
@@ -226,6 +229,9 @@ func (r *Roll) roll() error {
 	}
 
 	// process
+	if r.processor == nil {
+		return nil
+	}
 	debug("[process]")
 	if err := r.processor.Process(dir, remains); err != nil {
 		return err

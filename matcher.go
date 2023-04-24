@@ -32,6 +32,10 @@ type defaultMatcher struct {
 	once sync.Once
 }
 
+// DefaultMatcher matches the simple file names
+//
+// eg.
+// app.log app.log.1 app.log.2 ...
 func DefaultMatcher() *defaultMatcher {
 	return &defaultMatcher{}
 }
@@ -42,7 +46,7 @@ func (p *defaultMatcher) Match(base string) bool {
 
 func (m *defaultMatcher) regexp(file string) *regexp.Regexp {
 	m.once.Do(func() {
-		m.reg = regexp.MustCompile(strings.ReplaceAll(path.Base(file), ".", `\.`) + `\.?\d*`)
+		m.reg = regexp.MustCompile(strings.ReplaceAll(file, ".", `\.`) + `\.?\d*`)
 	})
 	return m.reg
 }

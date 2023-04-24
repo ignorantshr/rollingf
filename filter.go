@@ -32,11 +32,11 @@ var (
 	_ Filter = (*maxAgeFilter)(nil)
 )
 
-// MaxSizeFilter filter files by size
 type maxBackupsFilter struct {
 	maxBackups int
 }
 
+// MaxSizeFilter filter files by size
 func MaxBackupsFilter(maxBackups int) *maxBackupsFilter {
 	return &maxBackupsFilter{
 		maxBackups: maxBackups,
@@ -65,11 +65,11 @@ func (f *maxBackupsFilter) DealFiltered(dir string, filtered []os.DirEntry) erro
 	return nil
 }
 
-// maxAgeFilter filter files by age
 type maxAgeFilter struct {
 	maxAge time.Duration
 }
 
+// MaxAgeFilter filter files by age
 func MaxAgeFilter(maxAge time.Duration) (obj *maxAgeFilter) {
 	return &maxAgeFilter{
 		maxAge: maxAge,

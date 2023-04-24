@@ -29,13 +29,13 @@ var (
 	_ Checker = (*maxSizeChecker)(nil)
 )
 
-// intervalChecker checks whether a file should be rolled at regular intervals
-//
-// If interval <= 0, it will never roll.
 type intervalChecker struct {
 	interval time.Duration
 }
 
+// IntervalChecker checks whether a file should be rolled at regular intervals
+//
+// If interval <= 0, it will never roll.
 func IntervalChecker(interval time.Duration) *intervalChecker {
 	return &intervalChecker{
 		interval: interval,
@@ -58,11 +58,11 @@ func (c *intervalChecker) Check(_ string, st *Rstat) (bool, error) {
 	return time.Now().After(time.Unix(brithTime.Unix()).Add(c.interval)), nil
 }
 
-// maxSizeChecker checks whether a file should be rolled when its size exceeds maxSize
 type maxSizeChecker struct {
 	maxSize int64
 }
 
+// MaxSizeChecker checks whether a file should be rolled when its size(bytes) exceeds maxSize
 func MaxSizeChecker(maxSize int64) *maxSizeChecker {
 	return &maxSizeChecker{
 		maxSize: maxSize,

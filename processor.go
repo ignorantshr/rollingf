@@ -32,6 +32,7 @@ var _ Processor = (*defaultProcessor)(nil)
 type defaultProcessor struct {
 }
 
+// DefaultProcessor renames the files, increase the tail number of the file name.
 func DefaultProcessor() *defaultProcessor {
 	return &defaultProcessor{}
 }

@@ -34,7 +34,30 @@ func TestNew(t *testing.T) {
 }
 
 func TestNewRoll(t *testing.T) {
-	r := NewRoll("/tmp/any_app/app.log")
+	r := NewC("/tmp/any_app/app.log")
+	if r == nil {
+		t.Fatal("nil roll")
+	}
+	SetDebug(true)
+	defer func() {
+		r.Close()
+	}()
+
+	r.WithDefaultChecker(RollCheckerConf{
+		Interval: 1 * time.Minute,
+		MaxSize:  100,
+	}).WithDefaultFilter(RollFilterConf{
+		MaxBackups: 2,
+		MaxAge:     2 * time.Minute,
+	}).WithDefaultMatcher().WithDefaultProcessor()
+
+	r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
+	r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
+	r.Write([]byte("ccccccccccccccccccc\n"))
+}
+
+func TestNewRollSimple(t *testing.T) {
+	r := New(NewRollConf("/tmp/any_app/app.log", 1*time.Minute, 100, 2*time.Minute, 2))
 	if r == nil {
 		t.Fatal("nil roll")
 	}
@@ -57,7 +80,7 @@ func TestNewRoll(t *testing.T) {
 }
 
 func BenchmarkNewRollStd(b *testing.B) {
-	r := NewRoll("/tmp/any_app/app.log").
+	r := NewC("/tmp/any_app/app.log").
 		WithChecker(IntervalChecker(24 * time.Hour)).
 		WithChecker(MaxSizeChecker(1024 * 1024)).
 		WithFilter(MaxBackupsFilter(1)).
@@ -74,7 +97,7 @@ func BenchmarkNewRollStd(b *testing.B) {
 }
 
 func BenchmarkNewRoll(b *testing.B) {
-	r := NewRoll("/tmp/any_app/app.log").
+	r := NewC("/tmp/any_app/app.log").
 		WithChecker(IntervalChecker(24 * time.Hour)).
 		WithChecker(MaxSizeChecker(1024 * 1024)).
 		WithFilter(MaxBackupsFilter(1)).
