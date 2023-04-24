@@ -6,8 +6,6 @@ import (
 	"os"
 	"testing"
 	"time"
-
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func TestNew(t *testing.T) {
@@ -74,58 +72,23 @@ func BenchmarkNewRollStd(b *testing.B) {
 	}
 }
 
-func BenchmarkLumberjackStd(b *testing.B) {
-	log.SetOutput(&lumberjack.Logger{
-		Filename:   "/tmp/any_app/app.lumberjack.log",
-		MaxSize:    1, // megabytes
-		MaxBackups: 1,
-		MaxAge:     28,    //days
-		Compress:   false, // disabled by default
-	})
-
-	for i := 0; i < b.N; i++ {
-		log.Println("aaaaaaaaaaaaaaaaaaa")
-		log.Println("bbbbbbbbbbbbbbbbbbb")
-		log.Println("ccccccccccccccccccc")
-	}
-}
-
 func BenchmarkNewRoll(b *testing.B) {
-	l := NewRoll("/tmp/any_app/app.log").
+	r := NewRoll("/tmp/any_app/app.log").
 		WithChecker(IntervalChecker(24 * time.Hour)).
 		WithChecker(MaxSizeChecker(1024 * 1024)).
 		WithFilter(MaxBackupsFilter(1)).
 		WithFilter(MaxAgeFilter(28 * 24 * time.Hour)).
 		WithProcessor(NewDefaultProcessor())
-	if l == nil {
+	if r == nil {
 		b.Fatal("nil roll")
 	}
-	defer l.Close()
+	defer r.Close()
 
 	for i := 0; i < b.N; i++ {
 		go func() {
-			l.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-			l.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-			l.Write([]byte("ccccccccccccccccccc\n"))
-		}()
-	}
-}
-
-func BenchmarkLumberjack(b *testing.B) {
-	l := &lumberjack.Logger{
-		Filename:   "/tmp/any_app/lumberjack.log",
-		MaxSize:    1, // megabytes
-		MaxBackups: 1,
-		MaxAge:     28,    //days
-		Compress:   false, // disabled by default
-	}
-	defer l.Close()
-
-	for i := 0; i < b.N; i++ {
-		go func() {
-			l.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-			l.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-			l.Write([]byte("ccccccccccccccccccc\n"))
+			r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
+			r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
+			r.Write([]byte("ccccccccccccccccccc\n"))
 		}()
 	}
 }
@@ -135,8 +98,6 @@ func TestAlign(t *testing.T) {
 	fn := []string{
 		"app.log",
 		"app.log.1",
-		"lumberjack.log",
-		"lumberjack-2023-04-23T09-49-34.771.log",
 	}
 
 	for _, f := range fn {
