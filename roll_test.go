@@ -64,10 +64,6 @@ func BenchmarkNewRoll(b *testing.B) {
 		WithFilter(MaxAgeFilter(28 * 24 * time.Hour)).
 		WithProcessor(NewDefaultProcessor())
 
-	defer func() {
-		r.Close()
-	}()
-
 	log.SetOutput(r)
 	for i := 0; i < b.N; i++ {
 		log.Println("aaaaaaaaaaaaaaaaaaa")

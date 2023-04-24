@@ -15,12 +15,15 @@
 package rollinguf
 
 import (
+	"io"
 	"io/fs"
 	"os"
 	"path"
 	"sort"
 	"sync"
 )
+
+var _ io.WriteCloser = (*Roll)(nil)
 
 type Roll struct {
 	filePath string
@@ -30,6 +33,7 @@ type Roll struct {
 	processor Processor
 
 	f    *os.File
+	st   *Rstat
 	lock *sync.Mutex
 }
 
@@ -125,14 +129,31 @@ func (r *Roll) Write(p []byte) (n int, err error) {
 		}
 	}
 
-	return r.f.Write(p)
+	re, err := r.f.Write(p)
+	if err != nil {
+		return 0, err
+	}
+
+	r.st.update(int64(re))
+	return re, nil
 }
 
 func (r *Roll) Open() error {
 	debug("[Open]")
 	var err error
 	r.f, err = os.OpenFile(r.filePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-	return err
+	if err != nil {
+		return err
+	}
+
+	rs := &Rstat{}
+	err = rs.reset(r.filePath)
+	if err != nil {
+		return err
+	}
+	r.st = rs
+
+	return nil
 }
 
 func (r *Roll) Close() error {
@@ -195,14 +216,10 @@ func (r *Roll) roll() error {
 }
 
 func (r *Roll) checkChain() (bool, error) {
-	stat, err := os.Stat(r.filePath)
-	if err != nil {
-		return false, err
-	}
-
+	debug("[rstat] %s", r.st)
 	for _, checker := range r.checkers {
 		debug("[%s]", checker.Name())
-		rolling, err := checker.Check(r.filePath, stat)
+		rolling, err := checker.Check(r.filePath, r.st)
 		if err != nil {
 			return false, err
 		}
