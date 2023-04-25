@@ -7,16 +7,25 @@ import (
 	"runtime"
 )
 
-type Compare interface {
-	int
-}
+// type Compare interface {
+// 	int
+// }
 
-func min[T Compare](a, b T) T {
+// func min[T Compare](a, b T) T {
+// 	if a < b {
+// 		return a
+// 	}
+// 	return b
+// }
+
+func min(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
 }
+
+type any = interface{}
 
 var debugEnabled bool
 
