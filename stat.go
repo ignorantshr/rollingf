@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -31,6 +33,8 @@ type Rstat struct {
 	rSize         int64
 	modeTime      time.Time
 	birthTimespec *syscall.Timespec
+
+	mu sync.Mutex // todo test
 }
 
 // FileInfo returns the underlying fs.FileInfo.
@@ -43,7 +47,7 @@ func (r *Rstat) Name() string {
 }
 
 func (r *Rstat) Size() int64 {
-	return r.rSize
+	return atomic.LoadInt64(&r.rSize)
 }
 
 func (r *Rstat) Mode() fs.FileMode {
@@ -60,6 +64,9 @@ func (r *Rstat) IsDir() bool {
 
 // Birthtimespec returns the file's birth time.
 func (r *Rstat) Birthtimespec() (bool, syscall.Timespec) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if r.birthTimespec == nil {
 		return false, syscall.Timespec{}
 	}
@@ -73,6 +80,9 @@ func (r *Rstat) String() string {
 }
 
 func (r *Rstat) reset(filePath string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	info, err := os.Stat(filePath)
 	if err != nil {
 		return err
@@ -87,10 +97,14 @@ func (r *Rstat) reset(filePath string) error {
 		r.birthTimespec = &stat.Birthtimespec
 	}
 
+	debug("[reset]")
 	return nil
 }
 
 func (r *Rstat) update(size int64) {
-	r.rSize += size
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	atomic.AddInt64(&r.rSize, size)
 	r.modeTime = time.Now()
 }

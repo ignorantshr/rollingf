@@ -78,7 +78,7 @@ func (p *defaultProcessor) each(dir, base string) error {
 	newName := p.incrTailNumber(base)
 
 	debug("[Rename] %v --> %v", base, newName)
-	if err := os.Rename(path.Join(dir, base), path.Join(dir, newName)); err != nil {
+	if err := renameFile(dir, base, newName); err != nil {
 		return err
 	}
 	return nil

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"log"
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
@@ -159,9 +160,25 @@ func BenchmarkNewCWithoutLock(b *testing.B) {
 	}
 	defer r.Close()
 
-	r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-	r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-	r.Write([]byte("ccccccccccccccccccc\n"))
+	wg := sync.WaitGroup{}
+	for i := 0; i < b.N; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
+			r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
+			r.Write([]byte("ccccccccccccccccccc\n"))
+		}()
+	}
+	wg.Wait()
+
+	// for i := 0; i < b.N; i++ {
+	// 	go func() {
+	// 		r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
+	// 		r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
+	// 		r.Write([]byte("ccccccccccccccccccc\n"))
+	// 	}()
+	// }
 }
 
 func TestAlign(t *testing.T) {

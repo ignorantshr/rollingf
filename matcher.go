@@ -15,7 +15,6 @@
 package rollingf
 
 import (
-	"path"
 	"regexp"
 	"strings"
 	"sync"
@@ -24,8 +23,13 @@ import (
 // Matcher mathes the files for further processing
 type Matcher interface {
 	// Match return true if the file base name matches
-	Match(base string) bool
+	Match(base, other string) bool
+
+	// Init the matcher with the file's base name
+	Init(base string)
 }
+
+var _ Matcher = (*regexMatcher)(nil)
 
 type regexMatcher struct {
 	suffixPattern string
@@ -56,14 +60,13 @@ func NewRegexMatcher(suffixPattern string) *regexMatcher {
 	}
 }
 
-func (p *regexMatcher) Match(base string) bool {
-	return len(p.regexp(base).Find([]byte(path.Base(base)))) == len(base)
+func (p *regexMatcher) Match(base, other string) bool {
+	return len(p.reg.Find([]byte(other))) == len(other)
 }
 
-func (m *regexMatcher) regexp(file string) *regexp.Regexp {
+func (m *regexMatcher) Init(base string) {
 	m.once.Do(func() {
-		m.reg = regexp.MustCompile(strings.ReplaceAll(file, ".", `\.`) + m.suffixPattern)
-		// debug("[regexMatcher] pattern: %v", m.reg)
+		m.reg = regexp.MustCompile(strings.ReplaceAll(base, ".", `\.`) + m.suffixPattern)
+		debug("[regexMatcher] pattern: %v", m.reg)
 	})
-	return m.reg
 }

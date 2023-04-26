@@ -15,29 +15,30 @@
 package rollingf
 
 import (
-	"errors"
 	"io"
 	"io/fs"
 	"os"
 	"path"
 	"sort"
 	"sync"
+	"time"
 )
 
 var _ io.WriteCloser = (*Roll)(nil)
 
 type Roll struct {
-	filePath string
+	filePath    string
+	tmpFilePath string
 
 	checkers  []Checker
 	filters   []Filter
 	matcher   Matcher
 	processor Processor
 
-	f       *os.File
-	st      *Rstat
-	mu      *sync.Mutex
-	running bool
+	f        *os.File
+	st       *Rstat
+	mu       *sync.Mutex
+	rotateCh chan struct{}
 }
 
 // NewC creates a customizable Roll
@@ -75,13 +76,16 @@ func baseR(filePath string) *Roll {
 	r := &Roll{
 		filePath: filePath,
 		mu:       &sync.Mutex{},
-		running:  true,
+		rotateCh: make(chan struct{}),
 	}
 
 	if err := r.Open(); err != nil {
 		debug("[NewRoll] %v", err)
 		return nil
 	}
+
+	dir, base := path.Split(filePath)
+	r.tmpFilePath = dir + "_" + base
 
 	return r
 }
@@ -117,6 +121,7 @@ func (r *Roll) WithFilter(f ...Filter) *Roll {
 }
 
 func (r *Roll) WithMatcher(m Matcher) *Roll {
+	m.Init(path.Base(r.filePath))
 	r.matcher = m
 	return r
 }
@@ -141,12 +146,8 @@ func (r *Roll) WithOptions(opts ...Option) *Roll {
 //  4. Finally the remains will be rolled.
 func (r *Roll) Write(p []byte) (n int, err error) {
 	debug("[Write]")
-	r.Lock()
-	defer r.Unlock()
-
-	if !r.Running() {
-		return 0, nil
-	}
+	// r.Lock()
+	// defer r.Unlock()
 
 	// check
 	rolling, err := r.checkChain()
@@ -170,19 +171,20 @@ func (r *Roll) Write(p []byte) (n int, err error) {
 }
 
 func (r *Roll) Open() error {
-	debug("[Open]")
-	if !r.Running() {
-		return errors.New("rollingf is not running")
-	}
+	return r.openFile(r.filePath)
+}
+
+func (r *Roll) openFile(filePath string) error {
+	debug("[openFile]")
 
 	var err error
-	r.f, err = os.OpenFile(r.filePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	r.f, err = os.OpenFile(filePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 
 	rs := &Rstat{}
-	err = rs.reset(r.filePath)
+	err = rs.reset(filePath)
 	if err != nil {
 		return err
 	}
@@ -196,68 +198,26 @@ func (r *Roll) Close() error {
 	r.Lock()
 	defer r.Unlock()
 
-	r.running = false
 	return r.closeFile()
 }
 
 func (r *Roll) closeFile() error {
-	debug("[CloseFile]")
+	debug("[closeFile]")
 	return r.f.Close()
 }
 
 func (r *Roll) roll() error {
-	dir := path.Dir(r.filePath)
-	entries, err := os.ReadDir(dir)
+	err := func() error {
+		r.Lock()
+		defer r.Unlock()
+		return r.openNew()
+	}()
 	if err != nil {
 		return err
 	}
 
-	// match
-	if r.matcher == nil {
-		return nil
-	}
-	var files []fs.DirEntry
-	for _, e := range entries {
-		if e.Type().IsRegular() && r.matcher.Match(e.Name()) {
-			files = append(files, e)
-		}
-	}
-
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].Name() < files[j].Name()
-	})
-
-	// filter
-	remains, err := r.filterChain(files)
-	if err != nil {
-		return err
-	}
-
-	debugArray(remains, func(idx int) string {
-		return remains[idx].Name()
-	}, "[remain]")
-
-	if !r.Running() {
-		return nil
-	}
-
-	if err := r.closeFile(); err != nil {
-		return err
-	}
-
-	// process
-	if r.processor == nil {
-		return nil
-	}
-	debug("[process]")
-	if err := r.processor.Process(dir, remains); err != nil {
-		return err
-	}
-
-	if err := r.Open(); err != nil {
-		return err
-	}
-
+	go r.process()
+	r.rotateCh <- struct{}{}
 	return nil
 }
 
@@ -296,10 +256,6 @@ func (r *Roll) filterChain(files []os.DirEntry) ([]os.DirEntry, error) {
 	return remains, nil
 }
 
-func (r *Roll) Running() bool {
-	return r.running
-}
-
 func (r *Roll) Lock() {
 	if r.mu != nil {
 		r.mu.Lock()
@@ -310,4 +266,71 @@ func (r *Roll) Unlock() {
 	if r.mu != nil {
 		r.mu.Unlock()
 	}
+}
+
+func (r *Roll) openNew() error {
+	if err := r.closeFile(); err != nil {
+		debug("[closeFile] err: %v", err)
+		return err
+	}
+
+	return r.openFile(r.tmpFilePath)
+}
+
+func (r *Roll) process() {
+	select {
+	case <-r.rotateCh:
+		r.processOnce()
+	case <-time.After(time.Second * 5):
+		return
+	}
+}
+
+func (r *Roll) processOnce() error {
+	debug("[rprocessOnce]")
+	r.Lock()
+	defer r.Unlock()
+
+	dir := path.Dir(r.filePath)
+	base := path.Base(r.filePath)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+
+	// match
+	if r.matcher == nil {
+		return nil
+	}
+	var files []fs.DirEntry
+	for _, e := range entries {
+		if e.Type().IsRegular() && r.matcher.Match(base, e.Name()) {
+			files = append(files, e)
+		}
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Name() < files[j].Name()
+	})
+
+	// filter
+	remains, err := r.filterChain(files)
+	if err != nil {
+		return err
+	}
+
+	debugArray(remains, func(idx int) string {
+		return remains[idx].Name()
+	}, "[remain]")
+
+	// processor
+	if r.processor == nil {
+		return nil
+	}
+	debug("[processor]")
+	if err := r.processor.Process(dir, remains); err != nil {
+		return err
+	}
+
+	return os.Rename(r.tmpFilePath, r.filePath)
 }

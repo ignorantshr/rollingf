@@ -25,7 +25,7 @@ func Compress(format CompressFormat) Option {
 		if format == NoCompress {
 			return
 		}
-		r.matcher = CompressMatcher(format)
-		r.processor = Compressor(format)
+		r.WithMatcher(CompressMatcher(format)) 
+		r.WithProcessor(Compressor(format)) 
 	})
 }
