@@ -1,4 +1,4 @@
-# RollingF
+# RollingF [![GoDoc](https://godoc.org/github.com/ignorantshr/rollingf?status.svg)](https://godoc.org/github.com/ignorantshr/rollingf)
 
 RollingF is an IO tool that allows you to control the rules for rolling update files.
 
