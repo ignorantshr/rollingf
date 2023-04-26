@@ -27,26 +27,43 @@ type Matcher interface {
 	Match(base string) bool
 }
 
-type defaultMatcher struct {
-	reg  *regexp.Regexp
-	once sync.Once
+type regexMatcher struct {
+	suffixPattern string
+	reg           *regexp.Regexp
+	once          sync.Once
 }
 
 // DefaultMatcher matches the simple file names
 //
 // eg.
 // app.log app.log.1 app.log.2 ...
-func DefaultMatcher() *defaultMatcher {
-	return &defaultMatcher{}
+func DefaultMatcher() *regexMatcher {
+	return NewRegexMatcher(`(\.\d+)?$`)
 }
 
-func (p *defaultMatcher) Match(base string) bool {
+// CompressMatcher matches the file names with the .1.gz suffix
+//
+// eg.
+// app.log app.log.1.gz app.log.2.gz ...
+func CompressMatcher(format CompressFormat) *regexMatcher {
+	return NewRegexMatcher(`(\.\d+\` + cfSuffix[format] + `)?$`)
+}
+
+func NewRegexMatcher(suffixPattern string) *regexMatcher {
+	return &regexMatcher{
+		suffixPattern: suffixPattern,
+		once:          sync.Once{},
+	}
+}
+
+func (p *regexMatcher) Match(base string) bool {
 	return len(p.regexp(base).Find([]byte(path.Base(base)))) == len(base)
 }
 
-func (m *defaultMatcher) regexp(file string) *regexp.Regexp {
+func (m *regexMatcher) regexp(file string) *regexp.Regexp {
 	m.once.Do(func() {
-		m.reg = regexp.MustCompile(strings.ReplaceAll(file, ".", `\.`) + `\.?\d*`)
+		m.reg = regexp.MustCompile(strings.ReplaceAll(file, ".", `\.`) + m.suffixPattern)
+		// debug("[regexMatcher] pattern: %v", m.reg)
 	})
 	return m.reg
 }

@@ -22,7 +22,7 @@ import (
 	"time"
 )
 
-var tsFormat = "2006-01-02 15:04:05"
+const tsFormat = "2006-01-02 15:04:05"
 
 // Rstat wraps os.FileInfo with local stored information about the file.
 type Rstat struct {

@@ -33,7 +33,7 @@ func TestNew(t *testing.T) {
 	r.Write([]byte("ccccccccccccccccccc\n"))
 }
 
-func TestNewRoll(t *testing.T) {
+func TestNewC(t *testing.T) {
 	r := NewC("/tmp/any_app/app.log")
 	if r == nil {
 		t.Fatal("nil roll")
@@ -61,6 +61,7 @@ func TestNewRollSimple(t *testing.T) {
 	if r == nil {
 		t.Fatal("nil roll")
 	}
+
 	SetDebug(true)
 	defer func() {
 		r.Close()
@@ -79,7 +80,33 @@ func TestNewRollSimple(t *testing.T) {
 	r.Write([]byte("ccccccccccccccccccc\n"))
 }
 
-func BenchmarkNewRollStd(b *testing.B) {
+func TestOptionCompress(t *testing.T) {
+	r := New(NewRollConf("/tmp/any_app/app.log", 1*time.Minute, 100, 10*time.Minute, 5)).WithOptions(
+		Compress(Gzip),
+	)
+
+	SetDebug(true)
+	defer r.Close()
+
+	r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
+	r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
+	r.Write([]byte("ccccccccccccccccccc\n"))
+}
+
+func TestCompressorDegrade(t *testing.T) {
+	r := New(
+		NewRollConf("/tmp/any_app/app.log", 1*time.Minute, 100, 10*time.Minute, 5),
+		Lock(true),
+	).WithProcessor(Compressor("no support"))
+	SetDebug(true)
+	defer r.Close()
+
+	r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
+	r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
+	r.Write([]byte("ccccccccccccccccccc\n"))
+}
+
+func BenchmarkNewCStd(b *testing.B) {
 	r := NewC("/tmp/any_app/app.log").
 		WithChecker(IntervalChecker(24 * time.Hour)).
 		WithChecker(MaxSizeChecker(1024 * 1024)).
@@ -96,7 +123,7 @@ func BenchmarkNewRollStd(b *testing.B) {
 	}
 }
 
-func BenchmarkNewRoll(b *testing.B) {
+func BenchmarkNewC(b *testing.B) {
 	r := NewC("/tmp/any_app/app.log").
 		WithChecker(IntervalChecker(24 * time.Hour)).
 		WithChecker(MaxSizeChecker(1024 * 1024)).
@@ -116,6 +143,25 @@ func BenchmarkNewRoll(b *testing.B) {
 			r.Write([]byte("ccccccccccccccccccc\n"))
 		}()
 	}
+}
+
+func BenchmarkNewCWithoutLock(b *testing.B) {
+	r := NewC("/tmp/any_app/app.log").
+		WithChecker(IntervalChecker(24 * time.Hour)).
+		WithChecker(MaxSizeChecker(1024 * 1024)).
+		WithFilter(MaxBackupsFilter(5)).
+		WithFilter(MaxAgeFilter(28 * 24 * time.Hour)).
+		WithDefaultMatcher().
+		WithDefaultProcessor().
+		WithOptions(Lock(false))
+	if r == nil {
+		b.Fatal("nil roll")
+	}
+	defer r.Close()
+
+	r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
+	r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
+	r.Write([]byte("ccccccccccccccccccc\n"))
 }
 
 func TestAlign(t *testing.T) {

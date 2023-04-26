@@ -48,11 +48,13 @@ All the components has the default implementions.
   - `MaxSizeChecker` checks whether a file should be rolled when its size exceeds maxSize.
 - Matcher
   - `DefaultMatcher` matches the simple file names. eg. app.log app.log.1 app.log.2 ...
+  - `CompressMatcher` matches the compressed file names. eg. app.log app.log.1.gz app.log.2.gz ...
 - Filter
   - `MaxSizeFilter` filter files by size.
   - `MaxAgeFilter` filter files by age.
 - Processor
   - `DefaultProcessor` renames the files, increase the tail number of the file name.
+  - `Compressor` compress the files.
 
 ## Usage
 
@@ -67,7 +69,18 @@ All the components has the default implementions.
     rf.Write([]byte("simple rollingf"))
 ```
 
-### Customized usage with default implements
+compress
+
+```go
+    rf := rollingf.New(rollingf.NewRollConf("/tmp/any_app/any_app.log", time.Hour, 1024*1024, 30*24*time.Hour, 5)).WithOptions(rollingf.Compress(rollingf.Gzip))
+    if rf == nil {
+      return
+    }
+
+    rf.Write([]byte("simple rollingf"))
+```
+
+### Customized usage
 
 ```go
     rf := rollingf.NewC("/tmp/any_app/any_app.log")
@@ -113,7 +126,9 @@ func init() {
 }
 
 func logCore() zapcore.Core {
-    rf := rollingf.New(rollingf.NewRollConf("/tmp/any_app/any_app.log", time.Hour, 1024*1024, 30*24*time.Hour, 5))
+    rf := rollingf.New(
+      rollingf.NewRollConf("/tmp/any_app/any_app.log", time.Hour, 1024*1024, 30*24*time.Hour, 5),
+    )
     if rf == nil {
       return nil
     }

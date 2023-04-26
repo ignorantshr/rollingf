@@ -36,7 +36,7 @@ type Roll struct {
 
 	f       *os.File
 	st      *Rstat
-	lock    *sync.Mutex
+	mu      *sync.Mutex
 	running bool
 }
 
@@ -47,24 +47,18 @@ type Roll struct {
 //   - Mather
 //   - Filter
 //   - Processor
-func NewC(filePath string) *Roll {
-	r := &Roll{
-		filePath: filePath,
-		lock:     &sync.Mutex{},
-		running:  true,
-	}
-
-	if err := r.Open(); err != nil {
-		debug("[NewRoll] %v", err)
+func NewC(filePath string, opts ...Option) *Roll {
+	r := baseR(filePath)
+	if r == nil {
 		return nil
 	}
 
-	return r
+	return r.WithOptions(opts...)
 }
 
 // New roll creates a Roll with default components
-func New(c RollConf) *Roll {
-	r := NewC(c.FilePath)
+func New(c RollConf, opts ...Option) *Roll {
+	r := baseR(c.FilePath)
 	if r == nil {
 		return nil
 	}
@@ -73,6 +67,22 @@ func New(c RollConf) *Roll {
 	r = r.WithDefaultFilter(c.RollFilterConf)
 	r = r.WithDefaultMatcher()
 	r = r.WithDefaultProcessor()
+
+	return r.WithOptions(opts...)
+}
+
+func baseR(filePath string) *Roll {
+	r := &Roll{
+		filePath: filePath,
+		mu:       &sync.Mutex{},
+		running:  true,
+	}
+
+	if err := r.Open(); err != nil {
+		debug("[NewRoll] %v", err)
+		return nil
+	}
+
 	return r
 }
 
@@ -116,6 +126,13 @@ func (r *Roll) WithProcessor(p Processor) *Roll {
 	return r
 }
 
+func (r *Roll) WithOptions(opts ...Option) *Roll {
+	for _, opt := range opts {
+		opt.apply(r)
+	}
+	return r
+}
+
 // Write writes the given bytes to the file.
 //
 //  1. The rolling will be executed when trigger a Checker.
@@ -124,8 +141,8 @@ func (r *Roll) WithProcessor(p Processor) *Roll {
 //  4. Finally the remains will be rolled.
 func (r *Roll) Write(p []byte) (n int, err error) {
 	debug("[Write]")
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	r.Lock()
+	defer r.Unlock()
 
 	if !r.Running() {
 		return 0, nil
@@ -176,8 +193,8 @@ func (r *Roll) Open() error {
 
 func (r *Roll) Close() error {
 	debug("[Close]")
-	r.lock.Lock()
-	defer r.lock.Unlock()
+	r.Lock()
+	defer r.Unlock()
 
 	r.running = false
 	return r.closeFile()
@@ -245,7 +262,6 @@ func (r *Roll) roll() error {
 }
 
 func (r *Roll) checkChain() (bool, error) {
-	debug("[rstat] %s", r.st)
 	for _, checker := range r.checkers {
 		debug("[%s]", checker.Name())
 		rolling, err := checker.Check(r.filePath, r.st)
@@ -282,4 +298,16 @@ func (r *Roll) filterChain(files []os.DirEntry) ([]os.DirEntry, error) {
 
 func (r *Roll) Running() bool {
 	return r.running
+}
+
+func (r *Roll) Lock() {
+	if r.mu != nil {
+		r.mu.Lock()
+	}
+}
+
+func (r *Roll) Unlock() {
+	if r.mu != nil {
+		r.mu.Unlock()
+	}
 }
