@@ -14,7 +14,7 @@ func (f optionFunc) apply(r *Roll) {
 func Lock(enable bool) Option {
 	return optionFunc(func(r *Roll) {
 		if !enable {
-			r.mu = nil
+			r.rwmu = nil
 		}
 	})
 }

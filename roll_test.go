@@ -2,7 +2,6 @@ package rollingf
 
 import (
 	"bufio"
-	"log"
 	"os"
 	"sync"
 	"testing"
@@ -97,7 +96,6 @@ func TestOptionCompress(t *testing.T) {
 func TestCompressorDegrade(t *testing.T) {
 	r := New(
 		NewRollConf("/tmp/any_app/app.log", 1*time.Minute, 100, 10*time.Minute, 5),
-		Lock(true),
 	).WithProcessor(Compressor("no support"))
 	SetDebug(true)
 	defer r.Close()
@@ -107,28 +105,38 @@ func TestCompressorDegrade(t *testing.T) {
 	r.Write([]byte("ccccccccccccccccccc\n"))
 }
 
-func BenchmarkNewCStd(b *testing.B) {
+func TestConccurent(t *testing.T) {
 	r := NewC("/tmp/any_app/app.log").
 		WithChecker(IntervalChecker(24 * time.Hour)).
 		WithChecker(MaxSizeChecker(1024 * 1024)).
-		WithFilter(MaxBackupsFilter(1)).
+		WithFilter(MaxBackupsFilter(5)).
 		WithFilter(MaxAgeFilter(28 * 24 * time.Hour)).
 		WithDefaultMatcher().
 		WithDefaultProcessor()
-
-	log.SetOutput(r)
-	for i := 0; i < b.N; i++ {
-		log.Println("aaaaaaaaaaaaaaaaaaa")
-		log.Println("bbbbbbbbbbbbbbbbbbb")
-		log.Println("ccccccccccccccccccc")
+	if r == nil {
+		t.Fatal("nil roll")
 	}
+	SetDebug(true)
+	defer r.Close()
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
+			r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
+			r.Write([]byte("ccccccccccccccccccc\n"))
+		}()
+	}
+	wg.Wait()
 }
 
 func BenchmarkNewC(b *testing.B) {
 	r := NewC("/tmp/any_app/app.log").
 		WithChecker(IntervalChecker(24 * time.Hour)).
 		WithChecker(MaxSizeChecker(1024 * 1024)).
-		WithFilter(MaxBackupsFilter(1)).
+		WithFilter(MaxBackupsFilter(5)).
 		WithFilter(MaxAgeFilter(28 * 24 * time.Hour)).
 		WithDefaultMatcher().
 		WithDefaultProcessor()
@@ -137,20 +145,24 @@ func BenchmarkNewC(b *testing.B) {
 	}
 	defer r.Close()
 
+	wg := sync.WaitGroup{}
 	for i := 0; i < b.N; i++ {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
 			r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
 			r.Write([]byte("ccccccccccccccccccc\n"))
 		}()
 	}
+	wg.Wait()
 }
 
 func BenchmarkNewCWithoutLock(b *testing.B) {
 	r := NewC("/tmp/any_app/app.log").
 		WithChecker(IntervalChecker(24 * time.Hour)).
 		WithChecker(MaxSizeChecker(1024 * 1024)).
-		WithFilter(MaxBackupsFilter(5)).
+		WithFilter(MaxBackupsFilter(50)).
 		WithFilter(MaxAgeFilter(28 * 24 * time.Hour)).
 		WithDefaultMatcher().
 		WithDefaultProcessor().
@@ -171,21 +183,14 @@ func BenchmarkNewCWithoutLock(b *testing.B) {
 		}()
 	}
 	wg.Wait()
-
-	// for i := 0; i < b.N; i++ {
-	// 	go func() {
-	// 		r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-	// 		r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-	// 		r.Write([]byte("ccccccccccccccccccc\n"))
-	// 	}()
-	// }
 }
 
 func TestAlign(t *testing.T) {
 	pre := "/tmp/any_app/"
 	fn := []string{
 		"app.log",
-		"app.log.1",
+		// "app.log.1144",
+		// "app.log.2254",
 	}
 
 	for _, f := range fn {

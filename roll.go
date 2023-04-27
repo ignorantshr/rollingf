@@ -21,7 +21,6 @@ import (
 	"path"
 	"sort"
 	"sync"
-	"time"
 )
 
 var _ io.WriteCloser = (*Roll)(nil)
@@ -37,7 +36,7 @@ type Roll struct {
 
 	f        *os.File
 	st       *Rstat
-	mu       *sync.Mutex
+	rwmu     *sync.RWMutex
 	rotateCh chan struct{}
 }
 
@@ -75,8 +74,9 @@ func New(c RollConf, opts ...Option) *Roll {
 func baseR(filePath string) *Roll {
 	r := &Roll{
 		filePath: filePath,
-		mu:       &sync.Mutex{},
-		rotateCh: make(chan struct{}),
+		rwmu:     &sync.RWMutex{},
+		rotateCh: make(chan struct{}, 1),
+		st:       &Rstat{},
 	}
 
 	if err := r.Open(); err != nil {
@@ -161,6 +161,9 @@ func (r *Roll) Write(p []byte) (n int, err error) {
 		}
 	}
 
+	r.fWLock()
+	defer r.fWUnlock()
+
 	re, err := r.f.Write(p)
 	if err != nil {
 		return 0, err
@@ -175,7 +178,7 @@ func (r *Roll) Open() error {
 }
 
 func (r *Roll) openFile(filePath string) error {
-	debug("[openFile]")
+	debug("[openFile] %v", filePath)
 
 	var err error
 	r.f, err = os.OpenFile(filePath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
@@ -183,20 +186,19 @@ func (r *Roll) openFile(filePath string) error {
 		return err
 	}
 
-	rs := &Rstat{}
-	err = rs.reset(filePath)
+	err = r.st.reset(filePath)
 	if err != nil {
 		return err
 	}
-	r.st = rs
 
 	return nil
 }
 
 func (r *Roll) Close() error {
 	debug("[Close]")
-	r.Lock()
-	defer r.Unlock()
+	r.rotateCh <- struct{}{}
+	r.fOpLock()
+	defer r.fOpUnlock()
 
 	return r.closeFile()
 }
@@ -207,29 +209,26 @@ func (r *Roll) closeFile() error {
 }
 
 func (r *Roll) roll() error {
-	err := func() error {
-		r.Lock()
-		defer r.Unlock()
-		return r.openNew()
-	}()
-	if err != nil {
+	if err := r.openNew(); err != nil {
 		return err
 	}
 
 	go r.process()
-	r.rotateCh <- struct{}{}
 	return nil
 }
 
 func (r *Roll) checkChain() (bool, error) {
+	r.fWLock()
+	defer r.fWUnlock()
+
 	for _, checker := range r.checkers {
-		debug("[%s]", checker.Name())
+		// debug("[%s]", checker.Name())
 		rolling, err := checker.Check(r.filePath, r.st)
 		if err != nil {
 			return false, err
 		}
 		if rolling {
-			debug("[%s] hint", checker.Name())
+			debug("[%s] hint %d", checker.Name(), r.st.Size())
 			return true, nil
 		}
 	}
@@ -256,19 +255,10 @@ func (r *Roll) filterChain(files []os.DirEntry) ([]os.DirEntry, error) {
 	return remains, nil
 }
 
-func (r *Roll) Lock() {
-	if r.mu != nil {
-		r.mu.Lock()
-	}
-}
-
-func (r *Roll) Unlock() {
-	if r.mu != nil {
-		r.mu.Unlock()
-	}
-}
-
 func (r *Roll) openNew() error {
+	r.fOpLock()
+	defer r.fOpUnlock()
+
 	if err := r.closeFile(); err != nil {
 		debug("[closeFile] err: %v", err)
 		return err
@@ -279,17 +269,18 @@ func (r *Roll) openNew() error {
 
 func (r *Roll) process() {
 	select {
-	case <-r.rotateCh:
-		r.processOnce()
-	case <-time.After(time.Second * 5):
+	case r.rotateCh <- struct{}{}:
+		r.rollOnce()
+	default:
 		return
 	}
 }
 
-func (r *Roll) processOnce() error {
-	debug("[rprocessOnce]")
-	r.Lock()
-	defer r.Unlock()
+func (r *Roll) rollOnce() error {
+	debug("[rollingOnce]")
+	defer func() {
+		<-r.rotateCh
+	}()
 
 	dir := path.Dir(r.filePath)
 	base := path.Base(r.filePath)
@@ -333,4 +324,30 @@ func (r *Roll) processOnce() error {
 	}
 
 	return os.Rename(r.tmpFilePath, r.filePath)
+}
+
+// file write lock, exlusive for close and open
+func (r *Roll) fWLock() {
+	if r.rwmu != nil {
+		r.rwmu.RLock()
+	}
+}
+
+func (r *Roll) fWUnlock() {
+	if r.rwmu != nil {
+		r.rwmu.RUnlock()
+	}
+}
+
+// file operation lock, exlusive all file operation
+func (r *Roll) fOpLock() {
+	if r.rwmu != nil {
+		r.rwmu.Lock()
+	}
+}
+
+func (r *Roll) fOpUnlock() {
+	if r.rwmu != nil {
+		r.rwmu.Unlock()
+	}
 }

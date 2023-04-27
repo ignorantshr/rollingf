@@ -34,38 +34,56 @@ type Rstat struct {
 	modeTime      time.Time
 	birthTimespec *syscall.Timespec
 
-	mu sync.Mutex // todo test
+	mu sync.RWMutex // todo test
 }
 
 // FileInfo returns the underlying fs.FileInfo.
 func (r *Rstat) FileInfo() fs.FileInfo {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	return r.info
 }
 
 func (r *Rstat) Name() string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	return r.info.Name()
 }
 
 func (r *Rstat) Size() int64 {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	return atomic.LoadInt64(&r.rSize)
 }
 
 func (r *Rstat) Mode() fs.FileMode {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	return r.info.Mode()
 }
 
 func (r *Rstat) ModTime() time.Time {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	return r.modeTime
 }
 
 func (r *Rstat) IsDir() bool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	return r.info.IsDir()
 }
 
 // Birthtimespec returns the file's birth time.
 func (r *Rstat) Birthtimespec() (bool, syscall.Timespec) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	if r.birthTimespec == nil {
 		return false, syscall.Timespec{}
@@ -80,8 +98,8 @@ func (r *Rstat) String() string {
 }
 
 func (r *Rstat) reset(filePath string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.Lock()
+	defer r.Unlock()
 
 	info, err := os.Stat(filePath)
 	if err != nil {
@@ -102,9 +120,36 @@ func (r *Rstat) reset(filePath string) error {
 }
 
 func (r *Rstat) update(size int64) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+	r.Lock()
+	defer r.Unlock()
 
 	atomic.AddInt64(&r.rSize, size)
 	r.modeTime = time.Now()
+}
+
+func (r *Rstat) clone() *Rstat {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	c := &r
+	return *c
+}
+
+// Lock
+func (r *Rstat) Lock() {
+	r.mu.Lock()
+}
+
+func (r *Rstat) RLock() {
+	r.mu.RLock()
+
+}
+
+// Unlock
+func (r *Rstat) Unlock() {
+	r.mu.Unlock()
+}
+
+func (r *Rstat) RUnlock() {
+	r.mu.RUnlock()
 }
