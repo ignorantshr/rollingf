@@ -20,6 +20,8 @@ import (
 	"os"
 	"path"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -195,7 +197,6 @@ func (r *Roll) openFile(filePath string) error {
 }
 
 func (r *Roll) Close() error {
-	debug("[Close]")
 	r.rotateCh <- struct{}{}
 	r.fOpLock()
 	defer r.fOpUnlock()
@@ -218,11 +219,12 @@ func (r *Roll) roll() error {
 }
 
 func (r *Roll) checkChain() (bool, error) {
-	r.fWLock()
-	defer r.fWUnlock()
+	if r.st.Checked() {
+		return false, nil
+	}
 
+	defer r.st.SetChecked(true)
 	for _, checker := range r.checkers {
-		// debug("[%s]", checker.Name())
 		rolling, err := checker.Check(r.filePath, r.st)
 		if err != nil {
 			return false, err
@@ -272,7 +274,6 @@ func (r *Roll) process() {
 	case r.rotateCh <- struct{}{}:
 		r.rollOnce()
 	default:
-		return
 	}
 }
 
@@ -283,7 +284,6 @@ func (r *Roll) rollOnce() error {
 	}()
 
 	dir := path.Dir(r.filePath)
-	base := path.Base(r.filePath)
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err
@@ -295,14 +295,36 @@ func (r *Roll) rollOnce() error {
 	}
 	var files []fs.DirEntry
 	for _, e := range entries {
-		if e.Type().IsRegular() && r.matcher.Match(base, e.Name()) {
+		if e.Type().IsRegular() && r.matcher.Match(e.Name()) {
 			files = append(files, e)
 		}
 	}
 
 	sort.Slice(files, func(i, j int) bool {
-		return files[i].Name() < files[j].Name()
+		f1 := files[i].Name()
+		f2 := files[j].Name()
+		if len(f2) != len(f1) {
+			return len(f2) > len(f1)
+		}
+
+		idx1 := strings.LastIndexByte(f1, '.')
+		if idx1 == -1 {
+			idx1 = 0
+		}
+		idx2 := strings.LastIndexByte(f2, '.')
+		if idx2 == -1 {
+			idx2 = 0
+		}
+
+		n1, _ := strconv.Atoi(f1[idx1+1:])
+		n2, _ := strconv.Atoi(f2[idx2+1:])
+
+		return n1 < n2
 	})
+
+	debugArray(files, func(idx int) string {
+		return files[idx].Name()
+	}, "[sorted]")
 
 	// filter
 	remains, err := r.filterChain(files)

@@ -22,8 +22,8 @@ import (
 
 // Matcher mathes the files for further processing
 type Matcher interface {
-	// Match return true if the file base name matches
-	Match(base, other string) bool
+	// Match return true if other file base name matches
+	Match(other string) bool
 
 	// Init the matcher with the file's base name
 	Init(base string)
@@ -60,7 +60,7 @@ func NewRegexMatcher(suffixPattern string) *regexMatcher {
 	}
 }
 
-func (p *regexMatcher) Match(base, other string) bool {
+func (p *regexMatcher) Match(other string) bool {
 	return len(p.reg.Find([]byte(other))) == len(other)
 }
 

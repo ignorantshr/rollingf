@@ -108,8 +108,8 @@ func TestCompressorDegrade(t *testing.T) {
 func TestConccurent(t *testing.T) {
 	r := NewC("/tmp/any_app/app.log").
 		WithChecker(IntervalChecker(24 * time.Hour)).
-		WithChecker(MaxSizeChecker(1024 * 1024)).
-		WithFilter(MaxBackupsFilter(5)).
+		WithChecker(MaxSizeChecker(1024)).
+		WithFilter(MaxBackupsFilter(20)).
 		WithFilter(MaxAgeFilter(28 * 24 * time.Hour)).
 		WithDefaultMatcher().
 		WithDefaultProcessor()
@@ -120,7 +120,7 @@ func TestConccurent(t *testing.T) {
 	defer r.Close()
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

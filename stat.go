@@ -34,7 +34,9 @@ type Rstat struct {
 	modeTime      time.Time
 	birthTimespec *syscall.Timespec
 
-	mu sync.RWMutex // todo test
+	mu      sync.RWMutex
+	checkm  sync.RWMutex
+	checked bool
 }
 
 // FileInfo returns the underlying fs.FileInfo.
@@ -115,6 +117,8 @@ func (r *Rstat) reset(filePath string) error {
 		r.birthTimespec = &stat.Birthtimespec
 	}
 
+	r.SetChecked(false)
+
 	debug("[reset]")
 	return nil
 }
@@ -125,14 +129,21 @@ func (r *Rstat) update(size int64) {
 
 	atomic.AddInt64(&r.rSize, size)
 	r.modeTime = time.Now()
+	r.SetChecked(false)
 }
 
-func (r *Rstat) clone() *Rstat {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+func (r *Rstat) SetChecked(checked bool) {
+	r.checkm.Lock()
+	defer r.checkm.Unlock()
 
-	c := &r
-	return *c
+	r.checked = checked
+}
+
+func (r *Rstat) Checked() bool {
+	r.checkm.RLock()
+	defer r.checkm.RUnlock()
+
+	return r.checked
 }
 
 // Lock

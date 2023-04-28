@@ -46,7 +46,9 @@ func debugArray(arr any, formator func(idx int) string, format string, args ...a
 		return
 	}
 	_, f, l, _ := runtime.Caller(1)
+	pre := fmt.Sprintf("%s:%d [rollingf] ", f, l) + fmt.Sprintf(format, args...)
 	for i := range arr.([]os.DirEntry) {
-		log.Printf(fmt.Sprintf("%s:%d [rollingf] ", f, l) + fmt.Sprintf(format, args...) + fmt.Sprintf(" %s\n", formator(i)))
+		pre += fmt.Sprintf(" %s", formator(i))
 	}
+	log.Println(pre)
 }
