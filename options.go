@@ -4,15 +4,15 @@ type Option interface {
 	apply(r *Roll)
 }
 
-type optionFunc func(r *Roll)
+type OptionFunc func(r *Roll)
 
-func (f optionFunc) apply(r *Roll) {
+func (f OptionFunc) apply(r *Roll) {
 	f(r)
 }
 
 // Lock enables/disables rollingf's internal lock when Write. Default the lock is enable.
 func Lock(enable bool) Option {
-	return optionFunc(func(r *Roll) {
+	return OptionFunc(func(r *Roll) {
 		if !enable {
 			r.rwmu = nil
 		}
@@ -21,11 +21,11 @@ func Lock(enable bool) Option {
 
 // Compress specifies the format of the compressed file
 func Compress(format CompressFormat) Option {
-	return optionFunc(func(r *Roll) {
+	return OptionFunc(func(r *Roll) {
 		if format == NoCompress {
 			return
 		}
-		r.WithMatcher(CompressMatcher(format)) 
-		r.WithProcessor(Compressor(format)) 
+		r.WithMatcher(CompressMatcher(format))
+		r.WithProcessor(Compressor(format))
 	})
 }
