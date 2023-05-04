@@ -40,6 +40,7 @@ type Roll struct {
 	st       *Rstat
 	rwmu     *sync.RWMutex
 	rotateCh chan struct{}
+	checkCh  chan struct{}
 }
 
 // NewC creates a customizable Roll
@@ -78,6 +79,7 @@ func baseR(filePath string) *Roll {
 		filePath: filePath,
 		rwmu:     &sync.RWMutex{},
 		rotateCh: make(chan struct{}, 1),
+		checkCh:  make(chan struct{}, 1),
 		st:       &Rstat{},
 	}
 
@@ -85,6 +87,8 @@ func baseR(filePath string) *Roll {
 		debug("[NewRoll] %v", err)
 		return nil
 	}
+
+	go r.checkAndRoll()
 
 	dir, base := path.Split(filePath)
 	r.tmpFilePath = dir + "_" + base
@@ -151,18 +155,6 @@ func (r *Roll) Write(p []byte) (n int, err error) {
 	// r.Lock()
 	// defer r.Unlock()
 
-	// check
-	rolling, err := r.checkChain()
-	if err != nil {
-		return 0, err
-	}
-
-	if rolling {
-		if err = r.roll(); err != nil {
-			return 0, err
-		}
-	}
-
 	r.fWLock()
 	defer r.fWUnlock()
 
@@ -172,11 +164,16 @@ func (r *Roll) Write(p []byte) (n int, err error) {
 	}
 
 	r.st.update(int64(re))
+	go r.checkOnce()
 	return re, nil
 }
 
 func (r *Roll) Open() error {
-	return r.openFile(r.filePath)
+	err := r.openFile(r.filePath)
+	if err != nil {
+		return err
+	}
+	return r.st.reset(r.filePath)
 }
 
 func (r *Roll) openFile(filePath string) error {
@@ -188,20 +185,20 @@ func (r *Roll) openFile(filePath string) error {
 		return err
 	}
 
-	err = r.st.reset(filePath)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
 func (r *Roll) Close() error {
-	r.rotateCh <- struct{}{}
 	r.fOpLock()
 	defer r.fOpUnlock()
+	r.rotateCh <- struct{}{}
+	debug("[Close]")
 
-	return r.closeFile()
+	if err := r.closeFile(); err != nil {
+		return err
+	}
+	r.f = nil
+	return nil
 }
 
 func (r *Roll) closeFile() error {
@@ -209,7 +206,36 @@ func (r *Roll) closeFile() error {
 	return r.f.Close()
 }
 
+func (r *Roll) checkOnce() {
+	select {
+	case r.checkCh <- struct{}{}:
+		r.checkAndRoll()
+	default:
+	}
+}
+
+func (r *Roll) checkAndRoll() {
+	for range r.checkCh {
+		rolling, err := r.checkChain()
+		if err != nil {
+			debug("[checkAndRoll] [check] err: %v", err)
+		}
+
+		if rolling {
+			if err = r.roll(); err != nil {
+				debug("[checkAndRoll] [check] err: %v", err)
+			}
+		}
+	}
+}
+
 func (r *Roll) roll() error {
+	r.fOpLock()
+	defer r.fOpUnlock()
+
+	if r.f == nil {
+		return nil
+	}
 	if err := r.openNew(); err != nil {
 		return err
 	}
@@ -219,11 +245,8 @@ func (r *Roll) roll() error {
 }
 
 func (r *Roll) checkChain() (bool, error) {
-	if r.st.Checked() {
-		return false, nil
-	}
-
-	defer r.st.SetChecked(true)
+	r.fWLock()
+	defer r.fWUnlock()
 	for _, checker := range r.checkers {
 		rolling, err := checker.Check(r.filePath, r.st)
 		if err != nil {
@@ -258,10 +281,12 @@ func (r *Roll) filterChain(files []os.DirEntry) ([]os.DirEntry, error) {
 }
 
 func (r *Roll) openNew() error {
-	r.fOpLock()
-	defer r.fOpUnlock()
+	err := r.st.reset(r.filePath)
+	if err != nil {
+		return err
+	}
 
-	if err := r.closeFile(); err != nil {
+	if err = r.closeFile(); err != nil {
 		debug("[closeFile] err: %v", err)
 		return err
 	}
@@ -348,7 +373,7 @@ func (r *Roll) rollOnce() error {
 	return os.Rename(r.tmpFilePath, r.filePath)
 }
 
-// file write lock, exlusive for close and open
+// lock for writing file, exlusive for close and open
 func (r *Roll) fWLock() {
 	if r.rwmu != nil {
 		r.rwmu.RLock()
@@ -361,7 +386,7 @@ func (r *Roll) fWUnlock() {
 	}
 }
 
-// file operation lock, exlusive all file operation
+// lock for operating file, exlusive all file operation
 func (r *Roll) fOpLock() {
 	if r.rwmu != nil {
 		r.rwmu.Lock()

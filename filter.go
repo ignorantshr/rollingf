@@ -56,8 +56,8 @@ func (f *maxBackupsFilter) Filter(files []os.DirEntry) ([]os.DirEntry, []os.DirE
 }
 
 func (f *maxBackupsFilter) DealFiltered(dir string, filtered []os.DirEntry) error {
+	debugArray(filtered, func(idx int) string { return filtered[idx].Name() }, "[remove]")
 	for _, file := range filtered {
-		debug("[remove] %v", file.Name())
 		if err := os.Remove(path.Join(dir, file.Name())); err != nil {
 			return err
 		}

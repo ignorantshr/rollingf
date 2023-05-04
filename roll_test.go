@@ -2,6 +2,7 @@ package rollingf
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"sync"
 	"testing"
@@ -12,8 +13,8 @@ func TestNew(t *testing.T) {
 	r := New(RollConf{
 		FilePath: "/tmp/any_app/app.log",
 		RollCheckerConf: RollCheckerConf{
-			Interval: 1 * time.Minute,
-			MaxSize:  100,
+			// Interval: 1 * time.Minute,
+			MaxSize: 100,
 		},
 		RollFilterConf: RollFilterConf{
 			MaxBackups: 20,
@@ -28,9 +29,7 @@ func TestNew(t *testing.T) {
 		r.Close()
 	}()
 
-	r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-	r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-	r.Write([]byte("ccccccccccccccccccc\n"))
+	write(r)
 }
 
 func TestNewC(t *testing.T) {
@@ -51,13 +50,11 @@ func TestNewC(t *testing.T) {
 		MaxAge:     2 * time.Minute,
 	}).WithDefaultMatcher().WithDefaultProcessor()
 
-	r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-	r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-	r.Write([]byte("ccccccccccccccccccc\n"))
+	write(r)
 }
 
 func TestNewRollSimple(t *testing.T) {
-	r := New(NewRollConf("/tmp/any_app/app.log", 1*time.Minute, 100, 2*time.Minute, 2))
+	r := New(NewRollConf("/tmp/any_app/app.log", 1*time.Minute, 100, 2*time.Minute, 20))
 	if r == nil {
 		t.Fatal("nil roll")
 	}
@@ -75,9 +72,7 @@ func TestNewRollSimple(t *testing.T) {
 		MaxAge:     2 * time.Minute,
 	}).WithDefaultMatcher().WithDefaultProcessor()
 
-	r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-	r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-	r.Write([]byte("ccccccccccccccccccc\n"))
+	write(r)
 }
 
 func TestOptionCompress(t *testing.T) {
@@ -88,9 +83,7 @@ func TestOptionCompress(t *testing.T) {
 	SetDebug(true)
 	defer r.Close()
 
-	r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-	r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-	r.Write([]byte("ccccccccccccccccccc\n"))
+	write(r)
 }
 
 func TestCompressorDegrade(t *testing.T) {
@@ -100,16 +93,14 @@ func TestCompressorDegrade(t *testing.T) {
 	SetDebug(true)
 	defer r.Close()
 
-	r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-	r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-	r.Write([]byte("ccccccccccccccccccc\n"))
+	write(r)
 }
 
 func TestConccurent(t *testing.T) {
 	r := NewC("/tmp/any_app/app.log").
-		WithChecker(IntervalChecker(24 * time.Hour)).
-		WithChecker(MaxSizeChecker(1024)).
-		WithFilter(MaxBackupsFilter(20)).
+		// WithChecker(IntervalChecker(24 * time.Hour)).
+		WithChecker(MaxSizeChecker(1024 * 1024)).
+		WithFilter(MaxBackupsFilter(20000)).
 		WithFilter(MaxAgeFilter(28 * 24 * time.Hour)).
 		WithDefaultMatcher().
 		WithDefaultProcessor()
@@ -120,13 +111,11 @@ func TestConccurent(t *testing.T) {
 	defer r.Close()
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 10000; i++ {
 		wg.Add(1)
-		go func() {
+		func() {
 			defer wg.Done()
-			r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-			r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-			r.Write([]byte("ccccccccccccccccccc\n"))
+			write(r)
 		}()
 	}
 	wg.Wait()
@@ -150,9 +139,7 @@ func BenchmarkNewC(b *testing.B) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-			r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-			r.Write([]byte("ccccccccccccccccccc\n"))
+			write(r)
 		}()
 	}
 	wg.Wait()
@@ -177,9 +164,7 @@ func BenchmarkNewCWithoutLock(b *testing.B) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			r.Write([]byte("aaaaaaaaaaaaaaaaaaa\n"))
-			r.Write([]byte("bbbbbbbbbbbbbbbbbbb\n"))
-			r.Write([]byte("ccccccccccccccccccc\n"))
+			write(r)
 		}()
 	}
 	wg.Wait()
@@ -218,4 +203,9 @@ func testAlign(fn string, t *testing.T) {
 			t.Fatal(n)
 		}
 	}
+}
+
+func write(w io.Writer) {
+	w.Write([]byte("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\n"))
+	w.Write([]byte("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n"))
 }
