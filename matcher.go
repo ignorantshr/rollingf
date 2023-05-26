@@ -66,7 +66,7 @@ func (p *regexMatcher) Match(other string) bool {
 
 func (m *regexMatcher) Init(base string) {
 	m.once.Do(func() {
-		m.reg = regexp.MustCompile(strings.ReplaceAll(base, ".", `\.`) + m.suffixPattern)
+		m.reg = regexp.MustCompile("^" + strings.ReplaceAll(base, ".", `\.`) + m.suffixPattern)
 		debug("[regexMatcher] pattern: %v", m.reg)
 	})
 }
